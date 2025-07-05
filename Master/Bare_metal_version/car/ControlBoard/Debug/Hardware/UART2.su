@@ -1,0 +1,2 @@
+../Hardware/UART2.c:8:6:JoinStick_Init	4	static
+../Hardware/UART2.c:65:6:USART3_IRQHandler	16	static

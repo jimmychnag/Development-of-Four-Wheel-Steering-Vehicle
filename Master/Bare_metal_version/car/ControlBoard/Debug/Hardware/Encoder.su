@@ -1,0 +1,4 @@
+../Hardware/Encoder.c:5:6:Encoder_Init	4	static
+../Hardware/Encoder.c:87:9:Encoder_Get	16	static
+../Hardware/Encoder.c:99:6:EXTI0_IRQHandler	4	static
+../Hardware/Encoder.c:111:6:EXTI1_IRQHandler	4	static

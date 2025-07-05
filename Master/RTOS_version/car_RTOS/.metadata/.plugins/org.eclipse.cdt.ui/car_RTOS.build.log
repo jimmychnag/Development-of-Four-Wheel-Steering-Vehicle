@@ -1,0 +1,33 @@
+23:49:02 **** Incremental Build of configuration Debug for project car_RTOS ****
+make -j20 all 
+arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -I../Middlewares/Third_Party/FreeRTOS/Source/include -I../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F -I"D:/Stm32Project/SideProject/cubeide/car_RTOS/car_RTOS/Hardware" -I"D:/Stm32Project/SideProject/cubeide/car_RTOS/car_RTOS/System" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/main.o"
+../Core/Src/main.c: In function 'TaskWheel1':
+../Core/Src/main.c:553:17: warning: unused variable 'flag' [-Wunused-variable]
+  553 |         uint8_t flag = osThreadFlagsWait(0x01, osFlagsWaitAny, osWaitForever);
+      |                 ^~~~
+../Core/Src/main.c: In function 'TaskWheel2':
+../Core/Src/main.c:576:13: warning: unused variable 'flag' [-Wunused-variable]
+  576 |     uint8_t flag = osThreadFlagsWait(0x01, osFlagsWaitAny, osWaitForever);
+      |             ^~~~
+../Core/Src/main.c: In function 'TaskWheel3':
+../Core/Src/main.c:598:17: warning: unused variable 'flag' [-Wunused-variable]
+  598 |         uint8_t flag = osThreadFlagsWait(0x01, osFlagsWaitAny, osWaitForever);
+      |                 ^~~~
+../Core/Src/main.c: In function 'TaskWheel4':
+../Core/Src/main.c:621:17: warning: unused variable 'flag' [-Wunused-variable]
+  621 |         uint8_t flag = osThreadFlagsWait(0x01, osFlagsWaitAny, osWaitForever);
+      |                 ^~~~
+arm-none-eabi-gcc -o "car_RTOS.elf" @"objects.list"   -mcpu=cortex-m4 -T"D:\Stm32Project\SideProject\cubeide\car_RTOS\car_RTOS\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="car_RTOS.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: car_RTOS.elf
+ 
+arm-none-eabi-size  car_RTOS.elf 
+arm-none-eabi-objdump -h -S car_RTOS.elf  > "car_RTOS.list"
+   text	   data	    bss	    dec	    hex	filename
+  35348	     80	  20824	  56252	   dbbc	car_RTOS.elf
+Finished building: default.size.stdout
+ 
+Finished building: car_RTOS.list
+ 
+
+23:49:04 Build Finished. 0 errors, 4 warnings. (took 1s.943ms)
+

@@ -1,0 +1,2 @@
+../Hardware/ADC.c:11:6:AD_Init	1
+../Hardware/ADC.c:97:6:AD_GetValue	2

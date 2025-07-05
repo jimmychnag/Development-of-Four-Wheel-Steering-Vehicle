@@ -1,0 +1,3 @@
+../Drivers/CMSIS/Include/core_cm4.h:1814:22:__NVIC_SetPriority	2
+../Hardware/UART2.c:10:6:JoinStick_Init	1
+../Hardware/UART2.c:70:6:USART3_IRQHandler	12

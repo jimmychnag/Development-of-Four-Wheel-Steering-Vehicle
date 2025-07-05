@@ -1,0 +1,3 @@
+../Hardware/PWM1.c:4:6:Pwm1_Init	1
+../Hardware/PWM1.c:71:6:PWM1_SetCompare1	1
+../Hardware/PWM1.c:76:6:PWM1_SetPrescaler	1

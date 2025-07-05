@@ -1,0 +1,3 @@
+../Hardware/PWM4.c:4:6:Pwm4_Init	4	static
+../Hardware/PWM4.c:71:6:PWM4_SetCompare1	16	static
+../Hardware/PWM4.c:76:6:PWM4_SetPrescaler	16	static

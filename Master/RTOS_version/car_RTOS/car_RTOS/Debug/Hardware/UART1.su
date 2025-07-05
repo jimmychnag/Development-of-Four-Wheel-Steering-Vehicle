@@ -1,0 +1,12 @@
+../Drivers/CMSIS/Include/core_cm4.h:1814:22:__NVIC_SetPriority	16	static
+../Hardware/UART1.c:18:6:Serial_Init	8	static
+../Hardware/UART1.c:78:6:Serial_SendByte	16	static
+../Hardware/UART1.c:92:6:Serial_SendArray	24	static
+../Hardware/UART1.c:106:6:Serial_SendString	24	static
+../Hardware/UART1.c:119:10:Serial_Pow	24	static
+../Hardware/UART1.c:135:6:Serial_SendNumber	24	static
+C:\ST\STM32CubeIDE_1.17.0\STM32CubeIDE\plugins\com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.12.3.rel1.win32_1.1.0.202410251130\tools\bin/../lib/gcc/arm-none-eabi/12.3.1/../../../../arm-none-eabi/include/stdio.h:220:5:fputc	16	static
+../Hardware/UART1.c:161:6:Serial_Printf	112	static
+../Hardware/UART1.c:176:9:Serial_GetRxFlag	4	static
+../Hardware/UART1.c:191:9:Serial_GetRxData	4	static
+../Hardware/UART1.c:204:6:USART1_IRQHandler	16	static
