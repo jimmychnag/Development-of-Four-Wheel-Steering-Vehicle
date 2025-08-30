@@ -18,4 +18,6 @@ void Serial_Printf(char *format, ...);
 uint8_t Serial_GetRxFlag(void);
 uint8_t Serial_GetRxData(void);
 
+extern uint16_t Encoder_Buffer[];
+
 #endif

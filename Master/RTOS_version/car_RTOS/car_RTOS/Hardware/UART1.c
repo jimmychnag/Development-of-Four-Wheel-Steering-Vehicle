@@ -7,7 +7,7 @@ uint8_t Serial_RxData;		//定义串口接收的数据变量
 uint8_t Serial_RxFlag;		//定义串口接收的标志位变量
 uint16_t Serial_RxPacket[4];				//定义接收数据包数组
 
-
+uint16_t Encoder_Buffer[4];
 
 
 /**
@@ -203,23 +203,22 @@ uint8_t Serial_GetRxData(void)
   */
 void USART1_IRQHandler(void)
 {
-	osMutexAcquire(EncoderMutex, osWaitForever);  // 獲取 Mutex，保護 LED2
 
-	static uint8_t RxState = 0;		//定义表示当前状态机状态的静态变量
+
+	static uint8_t RxState = 0;
 	static uint8_t Data_L,Data_H;
 
-	if ( USART1->SR & (1 << 5) ) 		//判断是否是USART1的接收事件触发的中断
+	if ( USART1->SR & (1 << 5) )
 	{
-		uint8_t RxData = USART1->DR;				//读取数据寄存器，存放在接收的数据变量
+		uint8_t RxData = USART1->DR;
 
-		/*使用状态机*/
 
 		//Start
 		if (RxState == 0)
 		{
-			if (RxData == 0xFF)			//如果数据确实是包头
+			if (RxData == 0xFF)
 			{
-				RxState = 1;			//置下一个状态
+				RxState = 1;
 			}
 		}
 
@@ -232,7 +231,7 @@ void USART1_IRQHandler(void)
 		else if(RxState == 2)
 		{
 			Data_H = RxData;
-			Serial_RxPacket[0] = (Data_H << 8) | Data_L;
+			Serial_RxPacket[0] = (Data_H << 6) | Data_L;
 			RxState = 3;
 		}
 		//2nd
@@ -244,7 +243,7 @@ void USART1_IRQHandler(void)
 		else if(RxState == 4)
 		{
 			Data_H = RxData;
-			Serial_RxPacket[1] = (Data_H << 8) | Data_L;
+			Serial_RxPacket[1] = (Data_H << 6) | Data_L;
 			RxState = 5;
 		}
 		//3rd
@@ -256,7 +255,7 @@ void USART1_IRQHandler(void)
 		else if(RxState == 6)
 		{
 			Data_H = RxData;
-			Serial_RxPacket[2] = (Data_H << 8) | Data_L;
+			Serial_RxPacket[2] = (Data_H << 6) | Data_L;
 			RxState = 7;
 		}
 		//4th
@@ -268,21 +267,27 @@ void USART1_IRQHandler(void)
 		else if(RxState == 8)
 		{
 			Data_H = RxData;
-			Serial_RxPacket[3] = (Data_H << 8) | Data_L;
+			Serial_RxPacket[3] = (Data_H << 6) | Data_L;
 			RxState = 9;
 		}
 
 		//end
 		else if (RxState == 9)
 		{
-			if (RxData == 0xFE)			//如果数据确实是包尾部
+			if (RxData == 0xFE)
 			{
-				RxState = 0;			//状态归0
-				Serial_RxFlag = 1;		//接收数据包标志位置1，成功接收一个数据包
+				RxState = 0;
+				Serial_RxFlag = 1;
+
+				Encoder_Buffer[0] = Serial_RxPacket[0];
+				Encoder_Buffer[1] = Serial_RxPacket[1];
+				Encoder_Buffer[2] = Serial_RxPacket[2];
+				Encoder_Buffer[3] = Serial_RxPacket[3];
+				osSemaphoreRelease(EncoderIRQHandle);
 			}
 		}
 
-		osMutexRelease(EncoderMutex);  // 釋放 Mutex
+
 		USART1->SR &= ~(1 << 5);
 	}
 }

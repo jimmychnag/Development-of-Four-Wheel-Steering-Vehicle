@@ -55,6 +55,9 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 
+
+
+
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -76,6 +79,11 @@ void Error_Handler(void);
 /* USER CODE BEGIN Private defines */
 extern osMutexId_t EncoderMutex;
 extern osMutexId_t HC05Mutex;
+
+
+extern osSemaphoreId_t EncoderIRQHandle;
+extern osSemaphoreId_t HC05IRQHandle;
+
 
 /* USER CODE END Private defines */
 

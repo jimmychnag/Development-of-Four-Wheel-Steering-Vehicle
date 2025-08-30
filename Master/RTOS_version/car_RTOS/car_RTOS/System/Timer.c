@@ -3,7 +3,7 @@
 
 
 //使用TIM12當作中斷來源
-//中斷頻率5ms
+//中斷頻率10ms
 void Timer_Init(void)
 {
 	RCC->APB1ENR |= 1 << 6;  //設定TIM12外設時鐘

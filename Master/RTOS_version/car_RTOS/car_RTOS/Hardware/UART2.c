@@ -7,6 +7,8 @@
 uint16_t JoinStick[3];
 uint8_t  JoinStickFlag;
 
+uint16_t User_Buffer[3];
+
 void JoinStick_Init(void)
 {
 
@@ -70,24 +72,22 @@ void JoinStick_Init(void)
 void USART3_IRQHandler(void)
 {
 
-	osMutexAcquire(HC05Mutex, osWaitForever);  // 獲取 Mutex，保護 LED2
 
 
-	static uint8_t RxState = 0;		//定义表示当前状态机状态的静态变量
+	static uint8_t RxState = 0;
 	static uint8_t Data_L,Data_H;
 
-	if ( USART3->SR & (1 << 5) ) 		//判断是否是USART1的接收事件触发的中断
+	if ( USART3->SR & (1 << 5) )
 	{
-		uint8_t RxData = USART3->DR;				//读取数据寄存器，存放在接收的数据变量
+		uint8_t RxData = USART3->DR;
 
-		/*使用状态机*/
 
 		//Start
 		if (RxState == 0)
 		{
-			if (RxData == 0xFF)			//如果数据确实是包头
+			if (RxData == 0xFF)
 			{
-				RxState = 1;			//置下一个状态
+				RxState = 1;
 			}
 		}
 
@@ -100,7 +100,8 @@ void USART3_IRQHandler(void)
 		else if(RxState == 2)
 		{
 			Data_H = RxData;
-			JoinStick[0] = (Data_H << 8) | Data_L;
+//			JoinStick[0] = (Data_H << 8) | Data_L;
+			JoinStick[0] = (Data_H << 6) | Data_L;
 			RxState = 3;
 		}
 		//2nd
@@ -112,7 +113,9 @@ void USART3_IRQHandler(void)
 		else if(RxState == 4)
 		{
 			Data_H = RxData;
-			JoinStick[1] = (Data_H << 8) | Data_L;
+//			JoinStick[1] = (Data_H << 8) | Data_L;
+			JoinStick[1] = (Data_H << 6) | Data_L;
+
 			RxState = 5;
 		}
 		//3rd
@@ -124,21 +127,30 @@ void USART3_IRQHandler(void)
 		else if(RxState == 6)
 		{
 			Data_H = RxData;
-			JoinStick[2] = (Data_H << 8) | Data_L;
+//			JoinStick[2] = (Data_H << 8) | Data_L;
+			JoinStick[2] = (Data_H << 6) | Data_L;
+
 			RxState = 7;
 		}
 
 		//end
 		else if (RxState == 7)
 		{
-			if (RxData == 0xFE)			//如果数据确实是包尾部
+			if (RxData == 0xFE)
 			{
-				RxState = 0;			//状态归0
-				JoinStickFlag = 1;		//接收数据包标志位置1，成功接收一个数据包
+				RxState = 0;
+				JoinStickFlag = 1;
+
+
+				User_Buffer[0] = JoinStick[0];
+				User_Buffer[1] = JoinStick[1];
+				User_Buffer[2] = JoinStick[2];
+
+				osSemaphoreRelease(HC05IRQHandle);
 			}
 		}
 
-		osMutexRelease(HC05Mutex);  // 釋放 Mutex
+
 
 		USART3->SR &= ~(1 << 5);
 	}

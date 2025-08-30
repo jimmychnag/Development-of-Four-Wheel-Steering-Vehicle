@@ -1,0 +1,161 @@
+#include <stm32f446xx.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <main.h>
+
+
+uint16_t JoinStick[3];
+uint8_t  JoinStickFlag;
+
+uint16_t User_Buffer[3];
+
+void JoinStick_Init(void)
+{
+
+	//開啟USART2、GPIOA時鐘
+	RCC->APB1ENR |= 1 << 18;
+	RCC->AHB1ENR |= 1 << 2;
+
+	//TX
+	GPIOC->MODER &= ~(3 << 20);  // 清 PA2 模式位
+	GPIOC->MODER  |=  2 << 20;
+	GPIOC->OTYPER &=~(1 << 10);
+	GPIOC->OSPEEDR|=  3 << 20;
+
+	//RX
+	GPIOC->MODER &= ~(3 << 22);  // PA3 模式為輸入或 AF
+	GPIOC->MODER |=  (2 << 22);  // 設為 AF 模式
+	GPIOC->OSPEEDR|=  1 << 22;
+	GPIOC->PUPDR &= ~(3 << 22);
+	GPIOC->PUPDR |=  (1 << 22);  // 上拉
+
+	//PA2為TX復用輸出、PA3為RX上拉輸入
+	GPIOC->AFR[1] &= ~(0xF << 8);  // 清除 AFRH9（PA2）
+	GPIOC->AFR[1] |=  (7 << 8);    // AF7 = USART2_TX
+	GPIOC->AFR[1] &= ~(0xF << 12);  // 清除 AFRH10（PA2）
+	GPIOC->AFR[1] |=  (7 << 12);    // AF7 = USART2_RX
+
+//	//設置波特率(9600)
+	USART3->BRR  =  (273 << 4) | (0xD << 0);
+	USART3->CR1 &= ~(1 << 15);
+
+//	//設置波特率(115200)
+	USART3->BRR  =  (22 << 4) | (7 << 0);
+	USART3->CR1 &= ~(1 << 15);
+
+	//設置字長(8位元)、校驗(不使用)、發送始能、接收始能
+	USART3->CR1 &= ~(1 << 12);
+	USART3->CR1 &= ~(1 << 10);
+	USART3->CR1 |= 1 << 3;
+	USART3->CR1 |= 1 << 2;
+
+	//設置停止位(1bit)
+	USART3->CR2 &= ~(3 << 12);
+
+	//設置硬體流控(不用)
+	USART3->CR3 &= ~(7 << 8);
+
+
+	//設置當RXNE為1時，產生USART1中斷
+	USART3->CR1 |= 1 << 5;
+
+	//設置USART始能
+	USART3->CR1 |= 1 << 13;
+
+	//設置NVIC打開USART2的IRQHandler
+	NVIC->ISER[1] |= 1 << 7;  //位置在38
+
+	NVIC_SetPriority(USART3_IRQn, 8); // OK
+
+}
+
+void USART3_IRQHandler(void)
+{
+
+
+
+	static uint8_t RxState = 0;		//定义表示当前状态机状态的静态变量
+	static uint8_t Data_L,Data_H;
+
+	if ( USART3->SR & (1 << 5) ) 		//判断是否是USART1的接收事件触发的中断
+	{
+		uint8_t RxData = USART3->DR * 0x3F;				//读取数据寄存器，存放在接收的数据变量
+
+		/*使用状态机*/
+
+		//Start
+		if (RxState == 0)
+		{
+			if (RxData == 0xFF)			//如果数据确实是包头
+			{
+				RxState = 1;			//置下一个状态
+			}
+		}
+
+		//1st
+		else if(RxState == 1)
+		{
+			Data_L = RxData* 0x3F;
+			RxState = 2;
+		}
+		else if(RxState == 2)
+		{
+			Data_H = RxData* 0x3F;
+//			JoinStick[0] = (Data_H << 8) | Data_L;
+			JoinStick[0] = (Data_H << 6) | Data_L;
+			RxState = 3;
+		}
+		//2nd
+		else if(RxState == 3)
+		{
+			Data_L = RxData* 0x3F;
+			RxState = 4;
+		}
+		else if(RxState == 4)
+		{
+			Data_H = RxData* 0x3F;
+//			JoinStick[1] = (Data_H << 8) | Data_L;
+			JoinStick[1] = (Data_H << 6) | Data_L;
+
+			RxState = 5;
+		}
+		//3rd
+		else if(RxState == 5)
+		{
+			Data_L = RxData* 0x3F;
+			RxState = 6;
+		}
+		else if(RxState == 6)
+		{
+			Data_H = RxData* 0x3F;
+//			JoinStick[2] = (Data_H << 8) | Data_L;
+			JoinStick[2] = (Data_H << 6) | Data_L;
+
+			RxState = 7;
+		}
+
+		//end
+		else if (RxState == 7)
+		{
+			if (RxData == 0xFE)			//如果数据确实是包尾部
+			{
+				RxState = 0;			//状态归0
+				JoinStickFlag = 1;		//接收数据包标志位置1，成功接收一个数据包
+
+
+				User_Buffer[0] = JoinStick[0];
+				User_Buffer[1] = JoinStick[1];
+				User_Buffer[2] = JoinStick[2];
+
+				osSemaphoreRelease(HC05IRQHandle);
+			}
+		}
+
+
+
+		USART3->SR &= ~(1 << 5);
+	}
+}
+
+
+

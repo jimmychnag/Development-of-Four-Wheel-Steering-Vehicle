@@ -16,5 +16,6 @@ extern uint8_t  JoinStickFlag;
 void JoinStick_Init(void);
 
 
+extern uint16_t User_Buffer[3];
 
 #endif /* UART2_H_ */

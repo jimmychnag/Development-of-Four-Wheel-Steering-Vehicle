@@ -48,6 +48,35 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+typedef StaticQueue_t osStaticMessageQDef_t;
+osMessageQueueId_t EncoderHandle;
+uint8_t EncoderBuffer[ 16 * sizeof( uint16_t ) ];
+osStaticMessageQDef_t EncoderControlBlock;
+const osMessageQueueAttr_t Encoder_attributes = {
+  .name = "Encoder",
+  .cb_mem = &EncoderControlBlock,
+  .cb_size = sizeof(EncoderControlBlock),
+  .mq_mem = &EncoderBuffer,
+  .mq_size = sizeof(EncoderBuffer)
+};
+
+
+osMessageQueueId_t HC05Handle;
+uint8_t HC05Buffer[ 16 * sizeof( uint16_t ) ];
+osStaticMessageQDef_t HC05ControlBlock;
+const osMessageQueueAttr_t HC05_attributes = {
+  .name = "HC05",
+  .cb_mem = &HC05ControlBlock,
+  .cb_size = sizeof(HC05ControlBlock),
+  .mq_mem = &HC05Buffer,
+  .mq_size = sizeof(HC05Buffer)
+};
+
+
+
+
+
+
 
 /* USER CODE END PD */
 
@@ -88,33 +117,69 @@ const osThreadAttr_t TaskWheel4_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 
-osThreadId_t TaskEncoderHandle;
-const osThreadAttr_t TaskEncoder_attributes = {
-  .name = "TaskEncoder",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+osThreadId_t DataAcquireHandle;
+const osThreadAttr_t DataAcquire_attributes = {
+  .name = "DataAcquire",
+  .stack_size = 512 * 4,
+  .priority = (osPriority_t) osPriorityNormal2,
+};
+
+osThreadId_t AcquireEncoderHandle;
+const osThreadAttr_t AcquireEncoder_attributes = {
+  .name = "AcquireEncoder",
+  .stack_size = 512 * 4,
+  .priority = (osPriority_t) osPriorityNormal1,
 };
 
 
-osSemaphoreId_t semEncoderHandle;
-const osSemaphoreAttr_t semEncoder_attr = {
-  .name = "semEncoder"
-};
+
 
 osSemaphoreId_t semWheelHandle;
 const osSemaphoreAttr_t semWheel_attr = {
   .name = "semWheel"
 };
 
-osMutexId_t EncoderMutex;
-osMutexAttr_t EncoderMutex_attr = {
-    .name = "EncoderMutex"
+osSemaphoreId_t EncoderIRQHandle;
+const osSemaphoreAttr_t EncoderIRQ_attr = {
+  .name = "EncoderIRQ"
 };
 
-osMutexId_t HC05Mutex;
-osMutexAttr_t HC05Mutex_attr = {
-    .name = "HC05Mutex"
+osSemaphoreId_t HC05IRQHandle;
+const osSemaphoreAttr_t HC05_attr = {
+  .name = "HC05"
 };
+
+
+
+
+osMutexId_t EncoderMutex1;
+osMutexAttr_t EncoderMutex1_attr = {
+    .name = "EncoderMutex1",
+	.attr_bits = osMutexPrioInherit
+};
+
+osMutexId_t EncoderMutex2;
+osMutexAttr_t EncoderMutex2_attr = {
+    .name = "EncoderMutex2",
+	.attr_bits = osMutexPrioInherit
+};
+
+osMutexId_t EncoderMutex3;
+osMutexAttr_t EncoderMutex3_attr = {
+    .name = "EncoderMutex3",
+	.attr_bits = osMutexPrioInherit
+
+};
+
+osMutexId_t EncoderMutex4;
+osMutexAttr_t EncoderMutex4_attr = {
+    .name = "EncoderMutex4",
+	.attr_bits = osMutexPrioInherit
+
+};
+
+
+
 
 /* USER CODE BEGIN PV */
 /* USER CODE BEGIN PFP */
@@ -187,8 +252,8 @@ uint16_t d;
 //JointSitck 中心點校正
 uint8_t FirstJoint = 1;
 uint16_t Vx_central,Vy_central,Wz_central;
-float max_Lspeed = 15;
-float max_Rspeed = 10;
+float max_Lspeed = 30;
+float max_Rspeed = 30;
 
 uint8_t RxState = 0;
 /* USER CODE END PFP */
@@ -207,7 +272,12 @@ void TaskWheel1(void *argument);
 void TaskWheel2(void *argument);
 void TaskWheel3(void *argument);
 void TaskWheel4(void *argument);
-void TaskEncoder(void *argument);
+void DataAcquire(void *argument);
+
+
+void AcquireEncoder(void *argument);
+void AcquireUser(void *argument);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -248,75 +318,82 @@ int main(void)
   MX_GPIO_Init();
   /* USER CODE BEGIN 2 */
   OLED_Init();		//OLED初始化
-  	Timer_Init();
-  	Motor_Init();
+//  	Timer_Init();
+  Motor_Init();
 
-  	Serial_Init();		//串口初始化
-  	JoinStick_Init();
+  Serial_Init();		//串口初始化
+  JoinStick_Init();
   	//	AD_Init();
   	//	Encoder_Init();
 
 
-  	OLED_ShowString(1, 1, "TIM1:");
-  	OLED_ShowString(2, 1, "TIM2:");
-  	OLED_ShowString(3, 1, "TIM3:");
-  	OLED_ShowString(4, 1, "TIM4:");
+  OLED_ShowString(1, 1, "TIM1:");
+  OLED_ShowString(2, 1, "TIM2:");
+  OLED_ShowString(3, 1, "TIM3:");
+  OLED_ShowString(4, 1, "TIM4:");
 
 
-  	// 30RPM下 Kp = 2 Ki = 0.1 Kd = 0.02 good
-  	//wheel1
-  	wheel1.param.Kp = 1.5;
-  	wheel1.param.Ki = 0.15 / wheel1.param.Kp  ;
-  	wheel1.param.Kd = 0.03 / wheel1.param.Kp ;
-  	wheel1.param.Kr = 1.0f;
-  	wheel1.param.Umax = 200.0f;
-  	wheel1.param.Umin = -200.0f;
-  	wheel1.term.c1 = 0.1f;  // D 濾波器
-  	wheel1.term.c2 = 0.9f;
+  // 30RPM下 Kp = 2 Ki = 0.1 Kd = 0.02 good
+  //wheel1
+  wheel1.param.Kp = 1.5;
+  wheel1.param.Ki = 0.15 / wheel1.param.Kp  ;
+  wheel1.param.Kd = 0.03 / wheel1.param.Kp ;
+  wheel1.param.Kr = 1.0f;
+  wheel1.param.Umax = 200.0f;
+  wheel1.param.Umin = -200.0f;
+  wheel1.term.c1 = 0.1f;  // D 濾波器
+  wheel1.term.c2 = 0.9f;
 
-  	//wheel2
-  	wheel2.param.Kp = 1.5;
-  	wheel2.param.Ki = 0.15 / wheel2.param.Kp  ;
-  	wheel2.param.Kd = 0.03 / wheel2.param.Kp ;
-  	wheel2.param.Kr = 1.0f;
-  	wheel2.param.Umax = 200.0f;
-  	wheel2.param.Umin = -200.0f;
-  	wheel2.term.c1 = 0.1f;  // D 濾波器
-  	wheel2.term.c2 = 0.9f;
+  //wheel2
+  wheel2.param.Kp = 1.5;
+  wheel2.param.Ki = 0.15 / wheel2.param.Kp  ;
+  wheel2.param.Kd = 0.03 / wheel2.param.Kp ;
+  wheel2.param.Kr = 1.0f;
+  wheel2.param.Umax = 200.0f;
+  wheel2.param.Umin = -200.0f;
+  wheel2.term.c1 = 0.1f;  // D 濾波器
+  wheel2.term.c2 = 0.9f;
 
-  	//wheel3
-  	wheel3.param.Kp = 1.5;
-  	wheel3.param.Ki = 0.15 / wheel3.param.Kp  ;
-  	wheel3.param.Kd = 0.03 / wheel3.param.Kp ;
-  	wheel3.param.Kr = 1.0f;
-  	wheel3.param.Umax = 200.0f;
-  	wheel3.param.Umin = -200.0f;
-  	wheel3.term.c1 = 0.1f;  // D 濾波器
-  	wheel3.term.c2 = 0.9f;
+  //wheel3
+  wheel3.param.Kp = 1.5;
+  wheel3.param.Ki = 0.15 / wheel3.param.Kp  ;
+  wheel3.param.Kd = 0.03 / wheel3.param.Kp ;
+  wheel3.param.Kr = 1.0f;
+  wheel3.param.Umax = 200.0f;
+  wheel3.param.Umin = -200.0f;
+  wheel3.term.c1 = 0.1f;  // D 濾波器
+  wheel3.term.c2 = 0.9f;
 
-  	//wheel4
-  	wheel4.param.Kp = 1.5;
-  	wheel4.param.Ki = 0.15 / wheel4.param.Kp  ;
-  	wheel4.param.Kd = 0.03 / wheel4.param.Kp ;
-  	wheel4.param.Kr = 1.0f;
-  	wheel4.param.Umax = 200.0f;
-  	wheel4.param.Umin = -200.0f;
-  	wheel4.term.c1 = 0.1f;  // D 濾波器
-  	wheel4.term.c2 = 0.9f;
+  //wheel4
+  wheel4.param.Kp = 1.5;
+  wheel4.param.Ki = 0.15 / wheel4.param.Kp  ;
+  wheel4.param.Kd = 0.03 / wheel4.param.Kp ;
+  wheel4.param.Kr = 1.0f;
+  wheel4.param.Umax = 200.0f;
+  wheel4.param.Umin = -200.0f;
+  wheel4.term.c1 = 0.1f;  // D 濾波器
+  wheel4.term.c2 = 0.9f;
   /* USER CODE END 2 */
 
   /* Init scheduler */
   osKernelInitialize();
 
   /* USER CODE BEGIN RTOS_MUTEX */
-  EncoderMutex = osMutexNew(&EncoderMutex_attr);                   // 初始化 Mutex
-  EncoderMutex = osMutexNew(&HC05Mutex_attr);                   // 初始化 Mutex
+  EncoderMutex1 = osMutexNew(&EncoderMutex1_attr);                   // 初始化 Mutex
+  EncoderMutex2 = osMutexNew(&EncoderMutex2_attr);                   // 初始化 Mutex
+  EncoderMutex3 = osMutexNew(&EncoderMutex3_attr);                   // 初始化 Mutex
+  EncoderMutex4 = osMutexNew(&EncoderMutex4_attr);                   // 初始化 Mutex
+
 
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
-  semEncoderHandle = osSemaphoreNew(1, 0, &semEncoder_attr);  // binary semaphore，初始值 0
   semWheelHandle = osSemaphoreNew(4, 0, &semWheel_attr);  	  // 初始值 0，等待同步
+
+  EncoderIRQHandle = osSemaphoreNew(1, 0, &EncoderIRQ_attr);  // binary semaphore，初始值 0
+  HC05IRQHandle    = osSemaphoreNew(1, 0, &HC05_attr);
+
+
 
   /* USER CODE END RTOS_SEMAPHORES */
 
@@ -325,7 +402,8 @@ int main(void)
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
+
+
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -334,7 +412,9 @@ int main(void)
   TaskWheel2Handle  = osThreadNew(TaskWheel2, NULL, &TaskWheel2_attributes);
   TaskWheel3Handle  = osThreadNew(TaskWheel3, NULL, &TaskWheel3_attributes);
   TaskWheel4Handle  = osThreadNew(TaskWheel4, NULL, &TaskWheel4_attributes);
-  TaskEncoderHandle = osThreadNew(TaskEncoder, NULL, &TaskEncoder_attributes);
+  DataAcquireHandle = osThreadNew(DataAcquire, NULL, &DataAcquire_attributes);
+
+  AcquireEncoderHandle = osThreadNew(AcquireEncoder, NULL, &AcquireEncoder_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -479,61 +559,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
-/* USER CODE BEGIN 4 */
-void TIM8_BRK_TIM12_IRQHandler(void)
-{
-	if (TIM12->SR & (1 << 0))
-	{
 
-		osSemaphoreRelease(semEncoderHandle);
-
-		TIM12->SR &= ~(1 << 0);
-	}
-}
-
-void EncoderSpeed(void)
-{
-	//wheel1
-	wheel1_count = Serial_RxPacket[0];
-	wheel1_current = (int16_t)wheel1_count;
-	wheel1_delta = (int16_t)((uint16_t)wheel1_current - (uint16_t)wheel1_last_count);
-	wheel1_last_count = wheel1_current;
-
-	wheel1_motor_rps = (wheel1_delta / TICKS_PER_REV) / Sample_time ;
-	wheel1_motor_rpm = wheel1_motor_rps * 60;
-	WheelSpeed.speed1 = wheel1_motor_rpm;
-
-	//wheel2
-	wheel2_count = Serial_RxPacket[1];
-	wheel2_current = (int16_t)wheel2_count;
-	wheel2_delta = (int16_t)((uint16_t)wheel2_current - (uint16_t)wheel2_last_count);
-	wheel2_last_count = wheel2_current;
-
-	wheel2_motor_rps = (wheel2_delta / TICKS_PER_REV) / Sample_time ;
-	wheel2_motor_rpm = wheel2_motor_rps * 60;
-	WheelSpeed.speed2 = wheel2_motor_rpm;
-
-	//wheel3
-	wheel3_count = Serial_RxPacket[2];
-	wheel3_current = (int16_t)wheel3_count;
-	wheel3_delta = (int16_t)((uint16_t)wheel3_current - (uint16_t)wheel3_last_count);
-	wheel3_last_count = wheel3_current;
-
-	wheel3_motor_rps = (wheel3_delta / TICKS_PER_REV) / Sample_time ;
-	wheel3_motor_rpm = wheel3_motor_rps * 60;
-	WheelSpeed.speed3 = wheel3_motor_rpm;
-
-	//wheel4
-	wheel4_count = Serial_RxPacket[3];
-	wheel4_current = (int16_t)wheel4_count;
-	wheel4_delta = (int16_t)((uint16_t)wheel4_current - (uint16_t)wheel4_last_count);
-	wheel4_last_count = wheel4_current;
-
-	wheel4_motor_rps = (wheel4_delta / TICKS_PER_REV) / Sample_time ;
-	wheel4_motor_rpm = wheel4_motor_rps * 60;
-	WheelSpeed.speed4 = wheel4_motor_rpm;
-}
-/* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
 /**
@@ -548,19 +574,23 @@ void TaskWheel1(void *argument)
   /* Infinite loop */
   for(;;)
   {
-//	osSemaphoreAcquire(semWheelHandle, osWaitForever);
+	osSemaphoreAcquire(semWheelHandle, osWaitForever);
 
-	uint8_t flag = osThreadFlagsWait(0x01, osFlagsWaitAny, osWaitForever);
+//	uint8_t flag = osThreadFlagsWait(0x01, osFlagsWaitAny, osWaitForever);
 	wheel1_speed = -wheel1_speed;
 	wheel1.term.Ref = wheel1_speed;
+
+	osMutexAcquire(EncoderMutex1,osWaitForever);
 	wheel1.term.Fbk = WheelSpeed.speed1;
+	osMutexRelease(EncoderMutex1);
+
 	float wheel1_output = PID_Update(&wheel1);
 	wheel1_out = wheel1_output;
-	int wheel1_pwm = (int)(fabs(wheel1_out) / 200.0f * PWM_MAX);
+	int wheel1_pwm = (int)(fabs(wheel1_out) / 400.0f * PWM_MAX);
 	if (wheel1_pwm > PWM_MAX) wheel1_pwm = PWM_MAX;
 	Motor_SetSpeed(1,wheel1_pwm,wheel1_output);  // 設定 PWM duty
 
-//	osDelay(1);
+	osDelay(1);
   }
   /* USER CODE END 5 */
 }
@@ -571,19 +601,24 @@ void TaskWheel2(void *argument)
   /* Infinite loop */
   for(;;)
   {
-//	osSemaphoreAcquire(semWheelHandle, osWaitForever);
+	osSemaphoreAcquire(semWheelHandle, osWaitForever);
 
-    uint8_t flag = osThreadFlagsWait(0x01, osFlagsWaitAny, osWaitForever);
+//    uint8_t flag = osThreadFlagsWait(0x01, osFlagsWaitAny, osWaitForever);
 	wheel2_speed = -wheel2_speed;
 	wheel2.term.Ref = wheel2_speed;
+
+
+	osMutexAcquire(EncoderMutex2,osWaitForever);
 	wheel2.term.Fbk = WheelSpeed.speed2;
+	osMutexRelease(EncoderMutex2);
+
 	float wheel2_output = PID_Update(&wheel2);
 	wheel2_out = wheel2_output;
-	int wheel2_pwm = (int)(fabs(wheel2_out) / 200.0f * PWM_MAX);
+	int wheel2_pwm = (int)(fabs(wheel2_out) / 400.0f * PWM_MAX);
 	if (wheel2_pwm > PWM_MAX) wheel2_pwm = PWM_MAX;
 	Motor_SetSpeed(2,wheel2_pwm,wheel2_output);  // 設定 PWM duty
 
-//	osDelay(1);
+	osDelay(1);
   }
   /* USER CODE END 5 */
 }
@@ -594,18 +629,24 @@ void TaskWheel3(void *argument)
   /* Infinite loop */
   for(;;)
   {
-//	osSemaphoreAcquire(semWheelHandle, osWaitForever);
-	uint8_t flag = osThreadFlagsWait(0x01, osFlagsWaitAny, osWaitForever);
+	osSemaphoreAcquire(semWheelHandle, osWaitForever);
+//	uint8_t flag = osThreadFlagsWait(0x01, osFlagsWaitAny, osWaitForever);
 	wheel3_speed = -wheel3_speed;
 	wheel3.term.Ref = wheel3_speed;
+
+
+	osMutexAcquire(EncoderMutex3,osWaitForever);
 	wheel3.term.Fbk = WheelSpeed.speed3;
+	osMutexRelease(EncoderMutex3);
+
+
 	float wheel3_output = PID_Update(&wheel3);
 	wheel3_out = wheel3_output;
-	int wheel3_pwm = (int)(fabs(wheel3_out) / 200.0f * PWM_MAX);
+	int wheel3_pwm = (int)(fabs(wheel3_out) / 400.0f * PWM_MAX);
 	if (wheel3_pwm > PWM_MAX) wheel3_pwm = PWM_MAX;
 	Motor_SetSpeed(3,wheel3_pwm,wheel3_output);  // 設定 PWM duty
 
-//	osDelay(1);
+	osDelay(1);
 
   }
   /* USER CODE END 5 */
@@ -617,73 +658,156 @@ void TaskWheel4(void *argument)
   /* Infinite loop */
   for(;;)
   {
-//	osSemaphoreAcquire(semWheelHandle, osWaitForever);
-	uint8_t flag = osThreadFlagsWait(0x01, osFlagsWaitAny, osWaitForever);
+	osSemaphoreAcquire(semWheelHandle, osWaitForever);
+//	uint8_t flag = osThreadFlagsWait(0x01, osFlagsWaitAny, osWaitForever);
 	wheel4_speed = -wheel4_speed;
 	wheel4.term.Ref = wheel4_speed;
+
+
+	osMutexAcquire(EncoderMutex4,osWaitForever);
 	wheel4.term.Fbk = WheelSpeed.speed4;
+	osMutexRelease(EncoderMutex4);
+
 	float wheel4_output = PID_Update(&wheel4);
 	wheel4_out = wheel4_output;
-	int wheel4_pwm = (int)(fabs(wheel4_out) / 200.0f * PWM_MAX);
+	int wheel4_pwm = (int)(fabs(wheel4_out) / 400.0f * PWM_MAX);
 	if (wheel4_pwm > PWM_MAX) wheel4_pwm = PWM_MAX;
 	Motor_SetSpeed(4,wheel4_pwm,wheel4_output);  // 設定 PWM duty
 
-//	osDelay(1);
+	osDelay(1);
 
   }
   /* USER CODE END 5 */
 }
-void TaskEncoder(void *argument)
+void DataAcquire(void *argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
+  uint32_t tick;
+
+  tick = osKernelGetTickCount();        // retrieve the number of system ticks
   for(;;)
   {
+	tick += 10U;                      // delay 1000 ticks periodically
+	osDelayUntil(tick);
+
+
 	if(JoinStickFlag == 1 && FirstJoint == 1)
 	{
-		Vx_central = JoinStick[0];
-		Vy_central = JoinStick[1];
-		Wz_central = JoinStick[2];
+
+		osSemaphoreAcquire(HC05IRQHandle, osWaitForever);
+
+//		Vx_central = JoinStick[0];
+//		Vy_central = JoinStick[1];
+//		Wz_central = JoinStick[2];
+
+		Vx_central = User_Buffer[0];
+		Vy_central = User_Buffer[1];
+		Wz_central = User_Buffer[2];
+
+
 		FirstJoint = 0;
+
 	}
 	else if(FirstJoint == 0)
 	{
-		osSemaphoreAcquire(semEncoderHandle, osWaitForever);
 		Serial_SendByte(0x01);
 
-		osMutexAcquire(EncoderMutex, osWaitForever);  // 獲取 Mutex
-		EncoderSpeed();
-		osMutexRelease(EncoderMutex);  // 釋放 Mutex
+		x ++;
 
-		osMutexAcquire(HC05Mutex, osWaitForever);  // 獲取 Mutex
-		Vx = -((float)(JoinStick[0] - Vx_central) / (float)Vx_central) * max_Lspeed;
-		Vy =  ((float)(JoinStick[1] - Vy_central) / (float)Vy_central) * max_Lspeed;
+		osSemaphoreAcquire(HC05IRQHandle, osWaitForever);
 
+		Vx = -((float)(User_Buffer[0] - Vx_central) / (float)Vx_central) * max_Lspeed;
+		Vy =  ((float)(User_Buffer[1] - Vy_central) / (float)Vy_central) * max_Lspeed;
 
 		if( (JoinStick[2] - Wz_central) > -1000 && (JoinStick[2] - Wz_central) < 1000 )
 			Wz = 0;
 		else
-			Wz =  ((float)(JoinStick[2] - Wz_central) / (float)Wz_central) * max_Rspeed;
+			Wz =  ((float)(User_Buffer[2] - Wz_central) / (float)Wz_central) * max_Rspeed;
 
 		Wz = -Wz;
-		osMutexRelease(HC05Mutex);  // 釋放 Mutex
-
-		x ++;
 
 		wheel1_speed = Vx + Vy + alpha * Wz; //front right
 		wheel2_speed = Vx - Vy - alpha * Wz; //front left
 		wheel3_speed = Vx + Vy - alpha * Wz; //rear  left
 		wheel4_speed = Vx - Vy + alpha * Wz; //rear  right
 
+		osSemaphoreRelease(semWheelHandle);
+		osSemaphoreRelease(semWheelHandle);
+		osSemaphoreRelease(semWheelHandle);
+		osSemaphoreRelease(semWheelHandle);
 
-		osThreadFlagsSet(TaskWheel1Handle,0x01);
-		osThreadFlagsSet(TaskWheel2Handle,0x01);
-		osThreadFlagsSet(TaskWheel3Handle,0x01);
-		osThreadFlagsSet(TaskWheel4Handle,0x01);
+//		osThreadFlagsSet(TaskWheel1Handle,0x01);
+//		osThreadFlagsSet(TaskWheel2Handle,0x01);
+//		osThreadFlagsSet(TaskWheel3Handle,0x01);
+//		osThreadFlagsSet(TaskWheel4Handle,0x01);
 	}
   }
   /* USER CODE END 5 */
 }
+
+
+void AcquireEncoder(void *argument)
+{
+	for(;;)
+	{
+		osSemaphoreAcquire(EncoderIRQHandle, osWaitForever);
+
+		//wheel1
+//		wheel1_count = Serial_RxPacket[0];
+		wheel1_count = Encoder_Buffer[0];
+		wheel1_current = (int16_t)wheel1_count;
+		wheel1_delta = (int16_t)((uint16_t)wheel1_current - (uint16_t)wheel1_last_count);
+		wheel1_last_count = wheel1_current;
+
+		wheel1_motor_rps = (wheel1_delta / TICKS_PER_REV) / Sample_time ;
+		wheel1_motor_rpm = wheel1_motor_rps * 60;
+
+		//wheel2
+//		wheel2_count = Serial_RxPacket[1];
+		wheel2_count = Encoder_Buffer[1];
+		wheel2_current = (int16_t)wheel2_count;
+		wheel2_delta = (int16_t)((uint16_t)wheel2_current - (uint16_t)wheel2_last_count);
+		wheel2_last_count = wheel2_current;
+
+		wheel2_motor_rps = (wheel2_delta / TICKS_PER_REV) / Sample_time ;
+		wheel2_motor_rpm = wheel2_motor_rps * 60;
+
+		//wheel3
+//		wheel3_count = Serial_RxPacket[2];
+		wheel3_count = Encoder_Buffer[2];
+		wheel3_current = (int16_t)wheel3_count;
+		wheel3_delta = (int16_t)((uint16_t)wheel3_current - (uint16_t)wheel3_last_count);
+		wheel3_last_count = wheel3_current;
+
+		wheel3_motor_rps = (wheel3_delta / TICKS_PER_REV) / Sample_time ;
+		wheel3_motor_rpm = wheel3_motor_rps * 60;
+
+		//wheel4
+//		wheel4_count = Serial_RxPacket[3];
+		wheel4_count = Encoder_Buffer[3];
+		wheel4_current = (int16_t)wheel4_count;
+		wheel4_delta = (int16_t)((uint16_t)wheel4_current - (uint16_t)wheel4_last_count);
+		wheel4_last_count = wheel4_current;
+
+		wheel4_motor_rps = (wheel4_delta / TICKS_PER_REV) / Sample_time ;
+		wheel4_motor_rpm = wheel4_motor_rps * 60;
+
+		osMutexAcquire(EncoderMutex1,osWaitForever);
+		WheelSpeed.speed1 = wheel1_motor_rpm;
+		osMutexRelease(EncoderMutex1);
+		osMutexAcquire(EncoderMutex2,osWaitForever);
+		WheelSpeed.speed2 = wheel2_motor_rpm;
+		osMutexRelease(EncoderMutex2);
+		osMutexAcquire(EncoderMutex3,osWaitForever);
+		WheelSpeed.speed3 = wheel3_motor_rpm;
+		osMutexRelease(EncoderMutex3);
+		osMutexAcquire(EncoderMutex4,osWaitForever);
+		WheelSpeed.speed4 = wheel4_motor_rpm;
+		osMutexRelease(EncoderMutex4);
+	}
+}
+
 
 /**
   * @brief  This function is executed in case of error occurrence.
